@@ -1,0 +1,39 @@
+{
+  "name": "my-cdn",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "setup": "bun scripts/setup.ts",
+    "dev": "bun scripts/dev.ts",
+    "build": "bun scripts/build.ts",
+    "deploy": "bun run build && wrangler deploy",
+    "types": "wrangler types -c wrangler.template.jsonc",
+    "postinstall": "wrangler types -c wrangler.template.jsonc",
+    "typecheck": "tsc -p src/worker && tsc -p src/web",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate": "wrangler d1 migrations apply DB --remote",
+    "user:add": "bun scripts/seed.ts"
+  },
+  "dependencies": {
+    "@mantine/core": "^9.6.0",
+    "@mantine/dropzone": "^9.6.0",
+    "@mantine/hooks": "^9.6.0",
+    "@mantine/notifications": "^9.6.0",
+    "better-auth": "^1.7.3",
+    "kysely": "^0.29.0",
+    "kysely-d1": "^0.4.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router": "^8.3.0"
+  },
+  "devDependencies": {
+    "@clack/prompts": "^1.7.0",
+    "@cloudflare/workers-types": "^5.0.0",
+    "@types/bun": "latest",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "picocolors": "^1.1.1",
+    "typescript": "^5",
+    "wrangler": "^4.129.0"
+  }
+}

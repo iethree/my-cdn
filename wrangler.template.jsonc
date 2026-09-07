@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "my-cdn",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/i/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "my-cdn-db",
+      "database_id": "",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "my-cdn-storage" }],
+  "images": { "binding": "IMAGES" },
+  "send_email": [{ "name": "EMAIL", "remote": true }],
+  "routes": [{ "pattern": "cdn.example.com", "custom_domain": true }],
+  "vars": {
+    "APP_NAME": "my.cdn",
+    "EMAIL_FROM": "login@cdn.example.com"
+  }
+}

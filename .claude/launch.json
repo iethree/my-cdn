@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "my-cdn",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": [
+        "scripts/dev.ts",
+        "--port",
+        "8788"
+      ],
+      "port": 8788
+    }
+  ]
+}

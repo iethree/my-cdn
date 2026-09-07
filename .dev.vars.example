@@ -1,0 +1,4 @@
+# `bun run setup` writes this file for you. Copy it by hand only if you skipped setup.
+BETTER_AUTH_SECRET=replace-with-output-of: openssl rand -base64 32
+# Local dev only: print the magic link to the wrangler console instead of sending email.
+DEV_LOG_MAGIC_LINK=1
