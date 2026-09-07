@@ -135,7 +135,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
 
   if (method === "GET" && parts[0] === "config" && parts.length === 1) {
     const color = HEX_RE.test(env.APP_COLOR ?? "") ? env.APP_COLOR.toLowerCase() : DEFAULT_COLOR;
-    return Response.json({ name: env.APP_NAME, color } satisfies AppConfig, { headers: { "Cache-Control": "public, max-age=60" } });
+    return Response.json({ name: env.APP_NAME, color } satisfies AppConfig, { headers: { "Cache-Control": "no-cache" } });
   }
 
   if (method === "GET" && parts[0] === "tags") {

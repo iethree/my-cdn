@@ -22,7 +22,7 @@ export function cachedConfig(): AppConfig {
 }
 
 export async function fetchConfig(): Promise<AppConfig> {
-  const config = sanitize(await fetch("/api/config").then((r) => r.json()));
+  const config = sanitize(await fetch("/api/config", { cache: "no-store" }).then((r) => r.json()));
   try {
     localStorage.setItem(KEY, JSON.stringify(config));
   } catch {}

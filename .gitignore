@@ -41,3 +41,4 @@ wrangler.jsonc
 *.wrangler.jsonc
 *.dev.vars
 .wrangler
+src/web/favicon.svg
