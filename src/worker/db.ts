@@ -1,4 +1,4 @@
-import type { ImageDto, TagDto, UserDto } from "../shared/types";
+import { PAGE_SIZE, type ImageDto, type ImagePage, type TagDto, type UserDto } from "../shared/types";
 
 export type ImageRow = {
   id: string;
@@ -67,24 +67,51 @@ export async function getImage(db: D1Database, id: string): Promise<ImageDto | n
   return row ? (await hydrate(db, [row]))[0]! : null;
 }
 
-export async function listRecent(db: D1Database, limit: number) {
-  const { results } = await db.prepare(`${SELECT} ORDER BY created_at DESC LIMIT ?`).bind(limit).all<ImageRow>();
-  return hydrate(db, results);
+type Filter = { q?: string; tag?: string };
+
+function filterSql({ q, tag }: Filter): { where: string[]; binds: unknown[] } {
+  const where: string[] = [];
+  const binds: unknown[] = [];
+  if (q) {
+    const like = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+    where.push(
+      `(name LIKE ? ESCAPE '\\' OR original_name LIKE ? ESCAPE '\\'
+        OR id IN (SELECT image_id FROM image_alias WHERE name LIKE ? ESCAPE '\\')
+        OR id IN (SELECT it.image_id FROM image_tag it JOIN tag t ON t.id = it.tag_id WHERE t.name LIKE ? ESCAPE '\\'))`,
+    );
+    binds.push(like, like, like, like);
+  }
+  if (tag) {
+    where.push("id IN (SELECT it.image_id FROM image_tag it JOIN tag t ON t.id = it.tag_id WHERE t.name = ?)");
+    binds.push(tag);
+  }
+  return { where, binds };
 }
 
-export async function search(db: D1Database, q: string, limit: number) {
-  const like = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
-  const { results } = await db
-    .prepare(
-      `${SELECT} WHERE name LIKE ?1 ESCAPE '\\'
-         OR original_name LIKE ?1 ESCAPE '\\'
-         OR id IN (SELECT image_id FROM image_alias WHERE name LIKE ?1 ESCAPE '\\')
-         OR id IN (SELECT it.image_id FROM image_tag it JOIN tag t ON t.id = it.tag_id WHERE t.name LIKE ?1 ESCAPE '\\')
-       ORDER BY created_at DESC LIMIT ?2`,
-    )
-    .bind(like, limit)
-    .all<ImageRow>();
-  return hydrate(db, results);
+const CURSOR_RE = /^(\d{1,16}):([0-9a-f-]{36})$/;
+
+export async function listPage(db: D1Database, filter: Filter, cursor: string | null, limit = PAGE_SIZE): Promise<ImagePage> {
+  const { where, binds } = filterSql(filter);
+  const m = cursor ? CURSOR_RE.exec(cursor) : null;
+  const pageWhere = [...where];
+  const pageBinds = [...binds];
+  if (m) {
+    pageWhere.push("(created_at < ? OR (created_at = ? AND id < ?))");
+    pageBinds.push(Number(m[1]), Number(m[1]), m[2]);
+  }
+  const clause = (w: string[]) => (w.length ? `WHERE ${w.join(" AND ")}` : "");
+  const [rows, count] = await db.batch<ImageRow & { n?: number }>([
+    db.prepare(`${SELECT} ${clause(pageWhere)} ORDER BY created_at DESC, id DESC LIMIT ?`).bind(...pageBinds, limit + 1),
+    db.prepare(`SELECT COUNT(*) AS n FROM image ${clause(where)}`).bind(...binds),
+  ]);
+  const results = rows!.results.slice(0, limit);
+  const more = rows!.results.length > limit;
+  const last = results[results.length - 1];
+  return {
+    images: await hydrate(db, results),
+    nextCursor: more && last ? `${last.created_at}:${last.id}` : null,
+    total: (count!.results[0] as { n: number } | undefined)?.n ?? 0,
+  };
 }
 
 export async function listTags(db: D1Database): Promise<TagDto[]> {
@@ -94,16 +121,6 @@ export async function listTags(db: D1Database): Promise<TagDto[]> {
     )
     .all<TagDto>();
   return results;
-}
-
-export async function imagesForTag(db: D1Database, tag: string, limit: number) {
-  const { results } = await db
-    .prepare(
-      `${SELECT} WHERE id IN (SELECT it.image_id FROM image_tag it JOIN tag t ON t.id = it.tag_id WHERE t.name = ?1) ORDER BY created_at DESC LIMIT ?2`,
-    )
-    .bind(tag, limit)
-    .all<ImageRow>();
-  return hydrate(db, results);
 }
 
 export async function nameTaken(db: D1Database, name: string, exceptImageId = ""): Promise<boolean> {

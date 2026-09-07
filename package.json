@@ -12,7 +12,8 @@
     "typecheck": "tsc -p src/worker && tsc -p src/web",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate": "wrangler d1 migrations apply DB --remote",
-    "user:add": "bun scripts/seed.ts"
+    "user:add": "bun scripts/seed.ts",
+    "seed:images": "bun scripts/seed-images.ts"
   },
   "dependencies": {
     "@mantine/core": "^9.6.0",

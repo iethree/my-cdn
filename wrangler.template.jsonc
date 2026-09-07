@@ -25,6 +25,7 @@
   "routes": [{ "pattern": "cdn.example.com", "custom_domain": true }],
   "vars": {
     "APP_NAME": "my.cdn",
+    "APP_COLOR": "#9d03fc",
     "EMAIL_FROM": "login@cdn.example.com"
   }
 }

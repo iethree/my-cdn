@@ -4,7 +4,7 @@ import { Shell } from "../components/Shell";
 
 export function NotFound() {
   return (
-    <Shell>
+    <Shell title="Not found">
       <Stack align="center" py="xl" gap="xs">
         <Title order={2}>Nothing here</Title>
         <Text c="dimmed">That page doesn't exist.</Text>

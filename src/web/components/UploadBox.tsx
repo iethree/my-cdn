@@ -170,7 +170,7 @@ function UploadRow({ item, onDismiss }: { item: Item; onDismiss: () => void }) {
         </Group>
         <Progress.Root size="lg" radius="xl">
           <Tooltip label="Upload">
-            <Progress.Section value={uploadPct} color="plum" animated={item.stage === "uploading"} />
+            <Progress.Section value={uploadPct} color="brand" animated={item.stage === "uploading"} />
           </Tooltip>
           <Tooltip label="Compress and store">
             <Progress.Section value={processPct} color={item.stage === "done" ? "teal" : "grape"} animated={busy && item.stage !== "uploading"} />
@@ -186,7 +186,7 @@ function UploadRow({ item, onDismiss }: { item: Item; onDismiss: () => void }) {
             </Anchor>
             <CopyButton value={link}>
               {({ copied, copy }) => (
-                <Button size="compact-sm" variant={copied ? "filled" : "light"} color={copied ? "teal" : "plum"} onClick={copy} leftSection={copied ? <CheckIcon width={14} height={14} /> : <CopyIcon width={14} height={14} />}>
+                <Button size="compact-sm" variant={copied ? "filled" : "light"} color={copied ? "teal" : "brand"} onClick={copy} leftSection={copied ? <CheckIcon width={14} height={14} /> : <CopyIcon width={14} height={14} />}>
                   {copied ? "Copied" : "Copy"}
                 </Button>
               )}

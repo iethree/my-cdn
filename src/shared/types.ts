@@ -33,3 +33,8 @@ export function imageUrl(origin: string, name: string, width?: number): string {
 export type UserDto = { id: string; email: string; name: string; createdAt: string };
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export type AppConfig = { name: string; color: string };
+
+export type ImagePage = { images: ImageDto[]; nextCursor: string | null; total: number };
+export const PAGE_SIZE = 100;

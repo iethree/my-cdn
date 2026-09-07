@@ -1,7 +1,8 @@
-import { Loader, Stack, Title } from "@mantine/core";
+import { Anchor, Group, Loader, Stack, Text, Title } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router";
 import type { ImageDto, TagDto } from "../../shared/types";
 import { api } from "../api";
 import { ImageGrid } from "../components/ImageGrid";
@@ -16,6 +17,7 @@ export function Dashboard({ user }: { user: { email: string } }) {
   const [query, setQuery] = useState("");
   const [q] = useDebouncedValue(query.trim(), 250);
   const [images, setImages] = useState<ImageDto[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [tags, setTags] = useState<TagDto[]>([]);
   const [selected, setSelected] = useState<ImageDto | null>(null);
 
@@ -24,8 +26,12 @@ export function Dashboard({ user }: { user: { email: string } }) {
   useEffect(() => {
     let live = true;
     api
-      .images(q)
-      .then((r) => live && setImages(r))
+      .images(q, null, q ? 60 : 24)
+      .then((r) => {
+        if (!live) return;
+        setImages(r.images);
+        setTotal(r.total);
+      })
       .catch((e: Error) => notifications.show({ color: "red", message: e.message }));
     return () => {
       live = false;
@@ -40,6 +46,7 @@ export function Dashboard({ user }: { user: { email: string } }) {
     setImages((prev) => {
       if (!prev) return [img];
       const exists = prev.some((i) => i.id === img.id);
+      if (!exists) setTotal((t) => t + 1);
       return exists ? prev.map((i) => (i.id === img.id ? img : i)) : [img, ...prev];
     });
     setSelected((s) => (s?.id === img.id ? img : s));
@@ -48,6 +55,7 @@ export function Dashboard({ user }: { user: { email: string } }) {
 
   const drop = (id: string) => {
     setImages((prev) => prev?.filter((i) => i.id !== id) ?? null);
+    setTotal((t) => Math.max(0, t - 1));
     loadTags();
   };
 
@@ -74,9 +82,21 @@ export function Dashboard({ user }: { user: { email: string } }) {
         {!q && <UploadBox suggestions={tagNames} onUploaded={upsert} />}
 
         <section>
-          <Title order={3} mb="md">
-            {q ? `Results for “${q}”` : "Recent uploads"}
-          </Title>
+          <Group justify="space-between" align="baseline" mb="md">
+            <Group gap="sm" align="baseline">
+              <Title order={3}>{q ? `Results for “${q}”` : "Recent uploads"}</Title>
+              {images && total > images.length && (
+                <Text c="dimmed" size="sm">
+                  showing {images.length} of {total.toLocaleString()}
+                </Text>
+              )}
+            </Group>
+            {!q && (
+              <Anchor component={Link} to="/all" fw={700} size="sm">
+                View all →
+              </Anchor>
+            )}
+          </Group>
           {images === null ? <Loader /> : <ImageGrid images={images} onSelect={setSelected} allTags={tagNames} onTagsChange={changeTags} empty={q ? "No matches." : "Nothing uploaded yet. Drop an image above!"} />}
         </section>
 

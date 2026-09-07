@@ -2,8 +2,10 @@ import { Button, Center, Stack, Text, TextInput, Title } from "@mantine/core";
 import { useState, type FormEvent } from "react";
 import { authClient } from "../auth";
 import { Shell } from "../components/Shell";
+import { useConfig } from "../config";
 
 export function Login() {
+  const { name } = useConfig();
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -20,10 +22,10 @@ export function Login() {
   };
 
   return (
-    <Shell>
+    <Shell title="Sign in">
       <Center py="xl">
         <Stack className="sticker" p="xl" gap="md" maw={420} w="100%">
-          <Title order={2}>Sign in</Title>
+          <Title order={2}>Sign in to {name}</Title>
           {sent ? (
             <Text>
               If <b>{email}</b> is on the list, a sign-in link is on its way. It expires in 10 minutes.

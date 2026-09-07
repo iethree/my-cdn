@@ -103,7 +103,7 @@ export function ImageModal({ image, suggestions, onClose, onChange, onDelete }: 
               </Badge>
               <CopyButton value={imageUrl(origin, a)}>
                 {({ copied, copy }) => (
-                  <ActionIcon variant="light" color={copied ? "teal" : "plum"} onClick={copy} aria-label="Copy alias link">
+                  <ActionIcon variant="light" color={copied ? "teal" : "brand"} onClick={copy} aria-label="Copy alias link">
                     {copied ? <CheckIcon /> : <CopyIcon />}
                   </ActionIcon>
                 )}
@@ -158,7 +158,7 @@ function LinkRow({ label, url }: { label: string; url: string }) {
       rightSection={
         <CopyButton value={url}>
           {({ copied, copy }) => (
-            <ActionIcon variant="light" color={copied ? "teal" : "plum"} onClick={copy} aria-label="Copy link">
+            <ActionIcon variant="light" color={copied ? "teal" : "brand"} onClick={copy} aria-label="Copy link">
               {copied ? <CheckIcon /> : <CopyIcon />}
             </ActionIcon>
           )}

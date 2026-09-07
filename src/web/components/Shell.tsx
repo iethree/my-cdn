@@ -1,17 +1,35 @@
-import { ActionIcon, Container, Group, useComputedColorScheme, useMantineColorScheme } from "@mantine/core";
-import type { ReactNode } from "react";
+import { ActionIcon, Container, Group, Box, useComputedColorScheme, useMantineColorScheme } from "@mantine/core";
+import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router";
+import { applyDocument, useConfig } from "../config";
 import { MoonIcon, SunIcon } from "../icons";
 
-export function Shell({ children, right }: { children: ReactNode; right?: ReactNode }) {
-  const { setColorScheme } = useMantineColorScheme();
-  const scheme = useComputedColorScheme("light");
+function Wordmark({ name }: { name: string }) {
+  const dot = name.indexOf(".");
+  if (dot <= 0 || dot === name.length - 1) return <>{name}</>;
   return (
     <>
-      <header>
-          <Group justify="space-between" p="md">
+      {name.slice(0, dot)}
+      <span>.</span>
+      {name.slice(dot + 1)}
+    </>
+  );
+}
+
+export function Shell({ children, right, title }: { children: ReactNode; right?: ReactNode; title?: string }) {
+  const config = useConfig();
+  const { setColorScheme } = useMantineColorScheme();
+  const scheme = useComputedColorScheme("light");
+
+  useEffect(() => applyDocument(config, title), [config, title]);
+
+  return (
+    <>
+      <header className="topbar">
+        <Box p="sm">
+          <Group justify="space-between">
             <Link to="/" className="wordmark">
-              my<span>.</span>cdn
+              <Wordmark name={config.name} />
             </Link>
             <Group gap="xs">
               {right}
@@ -26,6 +44,7 @@ export function Shell({ children, right }: { children: ReactNode; right?: ReactN
               </ActionIcon>
             </Group>
           </Group>
+        </Box>
       </header>
       <Container size="lg" py="xl">
         {children}

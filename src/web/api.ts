@@ -1,4 +1,4 @@
-import type { ImageDto, TagDto, UploadEvent, UserDto } from "../shared/types";
+import type { ImageDto, ImagePage, TagDto, UploadEvent, UserDto } from "../shared/types";
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
@@ -11,8 +11,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return data as T;
 }
 
+const params = (o: Record<string, string | number | null | undefined>) =>
+  new URLSearchParams(Object.entries(o).filter(([, v]) => v != null && v !== "").map(([k, v]) => [k, String(v)])).toString();
+
 export const api = {
-  images: (q: string) => request<ImageDto[]>("GET", `/api/images?q=${encodeURIComponent(q)}`),
+  images: (q: string, cursor: string | null = null, limit?: number) =>
+    request<ImagePage>("GET", `/api/images?${params({ q, cursor, limit })}`),
   image: (id: string) => request<ImageDto>("GET", `/api/images/${id}`),
   update: (id: string, patch: { name?: string; tags?: string[] }) => request<ImageDto>("PATCH", `/api/images/${id}`, patch),
   remove: (id: string) => request<{ ok: true }>("DELETE", `/api/images/${id}`),
@@ -20,7 +24,8 @@ export const api = {
   removeAlias: (id: string, name: string) =>
     request<ImageDto>("DELETE", `/api/images/${id}/aliases/${encodeURIComponent(name)}`),
   tags: () => request<TagDto[]>("GET", "/api/tags"),
-  tag: (name: string) => request<{ tag: string; images: ImageDto[] }>("GET", `/api/tags/${encodeURIComponent(name)}`),
+  tag: (name: string, cursor: string | null = null) =>
+    request<{ tag: string } & ImagePage>("GET", `/api/tags/${encodeURIComponent(name)}?${params({ cursor })}`),
   users: () => request<UserDto[]>("GET", "/api/users"),
   addUser: (email: string) => request<UserDto[]>("POST", "/api/users", { email }),
   removeUser: (id: string) => request<UserDto[]>("DELETE", `/api/users/${id}`),

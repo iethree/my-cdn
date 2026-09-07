@@ -4,7 +4,6 @@ body {
 }
 
 .topbar {
-  border-bottom: 2px solid var(--mantine-color-default-border);
   background: var(--mantine-color-body);
   position: sticky;
   top: 0;
@@ -19,12 +18,11 @@ body {
   text-decoration: none;
 }
 .wordmark span {
-  color: var(--mantine-color-plum-6);
+  color: var(--mantine-color-brand-6);
 }
 
 .sticker {
   border: 2px solid var(--mantine-color-default-border);
-  box-shadow: 4px 4px 0 var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-lg);
   background: var(--mantine-color-body);
 }
@@ -33,20 +31,21 @@ body {
   position: relative;
   display: block;
   overflow: hidden;
-  box-shadow: none;
-  outline: 0 solid var(--mantine-color-default-border);
-  outline-offset: 0;
-  transition: outline-width 120ms ease;
+  transition: border-color 120ms ease;
 }
 .image-card:hover,
 .image-card:focus-within {
-  outline-width: 2px;
+  border-color: var(--mantine-color-brand-6);
 }
 .image-card-body {
   display: block;
   text-decoration: none;
   color: inherit;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .image-card-caption {
   padding: 8px 10px;
@@ -71,14 +70,14 @@ body {
 }
 
 .dropzone {
-  border: 3px dashed var(--mantine-color-plum-4);
+  border: 3px dashed var(--mantine-color-brand-4);
   border-radius: var(--mantine-radius-lg);
-  background: var(--mantine-color-plum-light);
+  background: var(--mantine-color-brand-light);
   transition: background 120ms ease, border-color 120ms ease;
 }
 .dropzone[data-accept] {
-  border-color: var(--mantine-color-plum-6);
-  background: var(--mantine-color-plum-light-hover);
+  border-color: var(--mantine-color-brand-6);
+  background: var(--mantine-color-brand-light-hover);
 }
 .dropzone[data-reject] {
   border-color: var(--mantine-color-red-6);

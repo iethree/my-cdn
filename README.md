@@ -16,7 +16,7 @@ bun install
 bun run setup
 ```
 
-Setup logs you in to Cloudflare if needed, asks for an app name, the domain to serve from, and your email, then shows you exactly what it's about to create before it touches anything:
+Setup logs you in to Cloudflare if needed, asks for an app name, a primary color, the domain to serve from, and your email, then shows you exactly what it's about to create before it touches anything:
 
 - a Worker with `<domain>` as a custom domain (Cloudflare handles DNS and TLS)
 - a D1 database with the schema from `migrations/`
@@ -27,6 +27,8 @@ Setup logs you in to Cloudflare if needed, asks for an app name, the domain to s
 
 It writes `wrangler.jsonc` and `.dev.vars` for you. Both are gitignored, so your ids and secrets never end up in a fork. The committed [wrangler.template.jsonc](wrangler.template.jsonc) is the source of truth for bindings.
 
+Change the name or color later by editing `APP_NAME` and `APP_COLOR` (any hex) under `vars` in `wrangler.jsonc` and redeploying.
+
 ## Day to day
 
 ```bash
@@ -34,6 +36,7 @@ bun run dev                        # http://localhost:8787, sign-in links print 
 bun run deploy                     # build + wrangler deploy
 bun run user:add someone@x.com --remote   # add a user from the CLI (or use /u in the app)
 bun run db:migrate                 # apply new migrations to production
+bun run seed:images --count 1000   # fill the local dev database with synthetic images
 ```
 
 ## Stack

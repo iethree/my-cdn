@@ -62,7 +62,7 @@ export function Users() {
   };
 
   return (
-    <Shell right={<SessionActions email={session.user.email} />}>
+    <Shell title="Users" right={<SessionActions email={session.user.email} />}>
       <Stack gap="xl" maw={640} mx="auto">
         <div>
           <Title order={2}>Users</Title>

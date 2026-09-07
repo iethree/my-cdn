@@ -1,4 +1,5 @@
-import { EMAIL_RE, NAME_RE, THUMB_WIDTHS, normalizeTag, TAG_RE, type UploadEvent } from "../shared/types";
+import { DEFAULT_COLOR, HEX_RE } from "../shared/colors";
+import { EMAIL_RE, NAME_RE, PAGE_SIZE, THUMB_WIDTHS, normalizeTag, TAG_RE, type AppConfig, type UploadEvent } from "../shared/types";
 import { createAuth } from "./auth";
 import * as db from "./db";
 import { HttpError, json } from "./http";
@@ -98,6 +99,11 @@ function ndjson(ctx: ExecutionContext, run: (emit: (e: UploadEvent) => Promise<v
   });
 }
 
+function pageLimit(url: URL): number {
+  const n = Number(url.searchParams.get("limit"));
+  return Number.isInteger(n) && n > 0 ? Math.min(n, PAGE_SIZE) : PAGE_SIZE;
+}
+
 function parseTags(input: unknown): string[] {
   const raw = Array.isArray(input) ? input : typeof input === "string" ? input.split(",") : [];
   const tags = new Set<string>();
@@ -127,11 +133,16 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
   const parts = url.pathname.slice(5).split("/").filter(Boolean).map(decodeURIComponent);
   const method = request.method;
 
+  if (method === "GET" && parts[0] === "config" && parts.length === 1) {
+    const color = HEX_RE.test(env.APP_COLOR ?? "") ? env.APP_COLOR.toLowerCase() : DEFAULT_COLOR;
+    return Response.json({ name: env.APP_NAME, color } satisfies AppConfig, { headers: { "Cache-Control": "public, max-age=60" } });
+  }
+
   if (method === "GET" && parts[0] === "tags") {
     if (parts.length === 1) return json(await db.listTags(env.DB));
     if (parts.length === 2) {
       const tag = normalizeTag(parts[1]!);
-      return json({ tag, images: await db.imagesForTag(env.DB, tag, 300) });
+      return json({ tag, ...(await db.listPage(env.DB, { tag }, url.searchParams.get("cursor"), pageLimit(url))) });
     }
   }
 
@@ -162,7 +173,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
   if (!id) {
     if (method === "GET") {
       const q = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
-      return json(q ? await db.search(env.DB, q, 60) : await db.listRecent(env.DB, 24));
+      return json(await db.listPage(env.DB, { q }, url.searchParams.get("cursor"), pageLimit(url)));
     }
     if (method === "POST") {
       if (Number(request.headers.get("Content-Length")) > MAX_BYTES + 4096) throw new HttpError(413, "File is larger than 25 MB");
