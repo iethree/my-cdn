@@ -26,6 +26,7 @@
   "vars": {
     "APP_NAME": "my.cdn",
     "APP_COLOR": "#9d03fc",
+    "PLAN": "paid",
     "EMAIL_FROM": "login@cdn.example.com"
   }
 }

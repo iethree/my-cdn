@@ -206,13 +206,27 @@ export async function countUsers(db: D1Database): Promise<number> {
   return row?.n ?? 0;
 }
 
-export function userInsert(db: D1Database, email: string) {
+// Creates the user and, when a hash is given, a credential account better-auth can sign in with.
+export function userInsert(db: D1Database, email: string, passwordHash?: string): D1PreparedStatement[] {
   const now = new Date().toISOString();
-  return db
-    .prepare(
-      'INSERT OR IGNORE INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES (?, ?, ?, 0, ?, ?)',
-    )
-    .bind(crypto.randomUUID(), email.split("@")[0], email, now, now);
+  const stmts = [
+    db
+      .prepare('INSERT OR IGNORE INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES (?, ?, ?, 0, ?, ?)')
+      .bind(crypto.randomUUID(), email.split("@")[0], email, now, now),
+  ];
+  if (passwordHash) {
+    stmts.push(
+      db
+        .prepare(
+          `INSERT INTO account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt")
+           SELECT ?, id, 'credential', id, ?, ?, ? FROM "user" u
+           WHERE lower(u.email) = lower(?)
+             AND NOT EXISTS (SELECT 1 FROM account a WHERE a."userId" = u.id AND a."providerId" = 'credential')`,
+        )
+        .bind(crypto.randomUUID(), passwordHash, now, now, email),
+    );
+  }
+  return stmts;
 }
 
 export async function deleteUser(db: D1Database, id: string) {

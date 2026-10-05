@@ -37,6 +37,7 @@ export function Shell({ children, right, title }: { children: ReactNode; right?:
                 variant="default"
                 size="lg"
                 radius="xl"
+                visibleFrom={right ? "sm" : undefined}
                 aria-label="Toggle color scheme"
                 onClick={() => setColorScheme(scheme === "dark" ? "light" : "dark")}
               >

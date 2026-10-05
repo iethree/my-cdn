@@ -107,6 +107,17 @@ export function Gallery({ docTitle, heading, fetchPage, keepAfterTagChange, empt
       });
   };
 
+  const remove = async (img: ImageDto) => {
+    try {
+      await api.remove(img.id);
+      setImages((prev) => prev?.filter((i) => i.id !== img.id) ?? prev);
+      setTotal((t) => Math.max(0, t - 1));
+      notifications.show({ message: `Deleted ${img.name}` });
+    } catch (e) {
+      notifications.show({ color: "red", message: e instanceof Error ? e.message : "Couldn't delete" });
+    }
+  };
+
   return (
     <Shell title={docTitle} right={session ? <SessionActions email={session.user.email} /> : undefined}>
       <Stack gap="lg">
@@ -123,7 +134,13 @@ export function Gallery({ docTitle, heading, fetchPage, keepAfterTagChange, empt
         ) : images === null ? (
           <Loader />
         ) : (
-          <ImageGrid images={images} allTags={session ? allTags : undefined} onTagsChange={session ? changeTags : undefined} empty={empty} />
+          <ImageGrid
+            images={images}
+            allTags={session ? allTags : undefined}
+            onTagsChange={session ? changeTags : undefined}
+            onDelete={session ? remove : undefined}
+            empty={empty}
+          />
         )}
         <div ref={sentinel} />
         {images && !exhausted.current && (

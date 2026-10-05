@@ -1,9 +1,11 @@
 import { DEFAULT_COLOR, HEX_RE } from "../shared/colors";
-import { EMAIL_RE, NAME_RE, PAGE_SIZE, THUMB_WIDTHS, normalizeTag, TAG_RE, type AppConfig, type UploadEvent } from "../shared/types";
+import { hashPassword, PASSWORD_MAX, PASSWORD_MIN } from "../shared/password";
+import { EMAIL_RE, NAME_RE, PAGE_SIZE, THUMB_WIDTHS, normalizeTag, TAG_RE, type AppConfig, type Plan, type UploadEvent } from "../shared/types";
 import { createAuth } from "./auth";
 import * as db from "./db";
 import { HttpError, json } from "./http";
 import { MAX_BYTES, processUpload } from "./images";
+import { collectStats } from "./stats";
 
 const IMMUTABLE = "public, max-age=86400";
 
@@ -99,6 +101,8 @@ function ndjson(ctx: ExecutionContext, run: (emit: (e: UploadEvent) => Promise<v
   });
 }
 
+const plan = (env: Env): Plan => ((env.PLAN as string) === "free" ? "free" : "paid");
+
 function pageLimit(url: URL): number {
   const n = Number(url.searchParams.get("limit"));
   return Number.isInteger(n) && n > 0 ? Math.min(n, PAGE_SIZE) : PAGE_SIZE;
@@ -135,7 +139,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
 
   if (method === "GET" && parts[0] === "config" && parts.length === 1) {
     const color = HEX_RE.test(env.APP_COLOR ?? "") ? env.APP_COLOR.toLowerCase() : DEFAULT_COLOR;
-    return Response.json({ name: env.APP_NAME, color } satisfies AppConfig, { headers: { "Cache-Control": "no-cache" } });
+    return Response.json({ name: env.APP_NAME, color, plan: plan(env) } satisfies AppConfig, { headers: { "Cache-Control": "no-cache" } });
   }
 
   if (method === "GET" && parts[0] === "tags") {
@@ -146,16 +150,32 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
     }
   }
 
+  if (method === "GET" && parts[0] === "images" && parts.length === 1) {
+    const q = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
+    return json(await db.listPage(env.DB, { q }, url.searchParams.get("cursor"), pageLimit(url)));
+  }
+
   if (method !== "GET" && request.headers.get("Origin") !== url.origin) throw new HttpError(403, "Bad origin");
   const session = await createAuth(env, url.origin).api.getSession({ headers: request.headers });
   if (!session) throw new HttpError(401, "Sign in required");
 
+  if (method === "GET" && parts[0] === "stats" && parts.length === 1) return json(await collectStats(env));
+
   if (parts[0] === "users") {
     if (method === "GET" && parts.length === 1) return json(await db.listUsers(env.DB));
     if (method === "POST" && parts.length === 1) {
-      const email = String((await readBody(request)).email ?? "").trim().toLowerCase();
+      const body = await readBody(request);
+      const email = String(body.email ?? "").trim().toLowerCase();
       if (!EMAIL_RE.test(email) || email.length > 254) throw new HttpError(400, "Enter a valid email address");
-      await db.userInsert(env.DB, email).run();
+      let hash: string | undefined;
+      if (plan(env) === "free") {
+        const password = typeof body.password === "string" ? body.password : "";
+        if (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) {
+          throw new HttpError(400, `Password must be ${PASSWORD_MIN} to ${PASSWORD_MAX} characters`);
+        }
+        hash = await hashPassword(password);
+      }
+      await env.DB.batch(db.userInsert(env.DB, email, hash));
       return json(await db.listUsers(env.DB));
     }
     if (method === "DELETE" && parts.length === 2) {
@@ -171,10 +191,6 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
   const [, id, sub, subId] = parts;
 
   if (!id) {
-    if (method === "GET") {
-      const q = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
-      return json(await db.listPage(env.DB, { q }, url.searchParams.get("cursor"), pageLimit(url)));
-    }
     if (method === "POST") {
       if (Number(request.headers.get("Content-Length")) > MAX_BYTES + 4096) throw new HttpError(413, "File is larger than 25 MB");
       const form = await request.formData();

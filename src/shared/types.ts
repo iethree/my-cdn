@@ -34,7 +34,13 @@ export type UserDto = { id: string; email: string; name: string; createdAt: stri
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export type AppConfig = { name: string; color: string };
+export type Plan = "free" | "paid";
+export type AppConfig = { name: string; color: string; plan: Plan };
 
 export type ImagePage = { images: ImageDto[]; nextCursor: string | null; total: number };
 export const PAGE_SIZE = 100;
+
+export type Stats = {
+  storage: { bytes: number; objects: number; limitBytes: number };
+  fetchedAt: string;
+};

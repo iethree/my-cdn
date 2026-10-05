@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 import { DEFAULT_COLOR, HEX_RE } from "../shared/colors";
 import type { AppConfig } from "../shared/types";
 
-export const DEFAULT_CONFIG: AppConfig = { name: "my.cdn", color: DEFAULT_COLOR };
+export const DEFAULT_CONFIG: AppConfig = { name: "my.cdn", color: DEFAULT_COLOR, plan: "paid" };
 const KEY = "app-config";
 
 function sanitize(raw: unknown): AppConfig {
@@ -10,6 +10,7 @@ function sanitize(raw: unknown): AppConfig {
   return {
     name: typeof c.name === "string" && c.name.trim() ? c.name.trim().slice(0, 40) : DEFAULT_CONFIG.name,
     color: typeof c.color === "string" && HEX_RE.test(c.color) ? c.color.toLowerCase() : DEFAULT_CONFIG.color,
+    plan: c.plan === "free" ? "free" : "paid",
   };
 }
 

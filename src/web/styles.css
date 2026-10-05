@@ -105,3 +105,9 @@ body {
 .tag-link {
   text-decoration: none;
 }
+
+.tag-row {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 48px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 48px), transparent);
+}

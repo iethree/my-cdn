@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { cachedConfig, ConfigContext, fetchConfig } from "./config";
 import { AllImages } from "./pages/AllImages";
+import { AllTags } from "./pages/AllTags";
 import { Home } from "./pages/Home";
 import { NotFound } from "./pages/NotFound";
+import { Settings } from "./pages/Settings";
 import { TagGallery } from "./pages/TagGallery";
 import { Users } from "./pages/Users";
 import { makeTheme } from "./theme";
@@ -17,7 +19,7 @@ export function App() {
   useEffect(() => {
     fetchConfig()
       .then((fresh) => {
-        if (fresh.name !== config.name || fresh.color !== config.color) setConfig(fresh);
+        if (fresh.name !== config.name || fresh.color !== config.color || fresh.plan !== config.plan) setConfig(fresh);
       })
       .catch(() => {});
   }, []);
@@ -29,9 +31,11 @@ export function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/t" element={<AllTags />} />
             <Route path="/t/:tag" element={<TagGallery />} />
             <Route path="/u" element={<Users />} />
             <Route path="/all" element={<AllImages />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "my-cdn",
+  "title": "my.cdn",
+  "description": "Search images on your my.cdn instance and copy their links.",
+  "icon": "icon.png",
+  "author": "ryan",
+  "categories": [
+    "Media",
+    "Developer Tools"
+  ],
+  "license": "MIT",
+  "platforms": [
+    "macOS"
+  ],
+  "preferences": [
+    {
+      "name": "baseUrl",
+      "title": "Base URL",
+      "description": "Where your my.cdn is deployed, e.g. https://cdn.example.com",
+      "type": "textfield",
+      "required": true,
+      "placeholder": "https://cdn.example.com"
+    }
+  ],
+  "commands": [
+    {
+      "name": "search-images",
+      "title": "Search Images",
+      "subtitle": "my.cdn",
+      "description": "Search images by name, alias or tag, then copy or paste their URL.",
+      "mode": "view"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^2.4.1",
+    "@raycast/utils": "^2.3.1"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.2.0",
+    "@types/node": "22.19.17",
+    "@types/react": "19.0.10",
+    "eslint": "^9.39.2",
+    "prettier": "^3.7.4",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop",
+    "lint": "ray lint",
+    "fix-lint": "ray lint --fix"
+  }
+}

@@ -1,4 +1,4 @@
-import type { ImageDto, ImagePage, TagDto, UploadEvent, UserDto } from "../shared/types";
+import type { ImageDto, ImagePage, Stats, TagDto, UploadEvent, UserDto } from "../shared/types";
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
@@ -27,8 +27,9 @@ export const api = {
   tag: (name: string, cursor: string | null = null) =>
     request<{ tag: string } & ImagePage>("GET", `/api/tags/${encodeURIComponent(name)}?${params({ cursor })}`),
   users: () => request<UserDto[]>("GET", "/api/users"),
-  addUser: (email: string) => request<UserDto[]>("POST", "/api/users", { email }),
+  addUser: (email: string, password?: string) => request<UserDto[]>("POST", "/api/users", { email, password }),
   removeUser: (id: string) => request<UserDto[]>("DELETE", `/api/users/${id}`),
+  stats: () => request<Stats>("GET", "/api/stats"),
 };
 
 export type ClientUploadEvent = { stage: "uploading"; loaded: number; total: number } | UploadEvent;
@@ -81,6 +82,7 @@ export function uploadImage(file: File, tags: string[], onEvent: (e: ClientUploa
 
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  if (n < 1024 ** 2) return `${(n / 1024).toFixed(0)} KB`;
+  if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`;
+  return `${(n / 1024 ** 3).toFixed(2)} GB`;
 }

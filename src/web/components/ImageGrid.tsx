@@ -3,6 +3,7 @@ import { notifications } from "@mantine/notifications";
 import { useRef, type PointerEvent, type SyntheticEvent } from "react";
 import { imageUrl, type ImageDto } from "../../shared/types";
 import { CheckIcon, CopyIcon } from "../icons";
+import { DeletePopover } from "./DeletePopover";
 import { LazyImage } from "./LazyImage";
 import { TagPopover } from "./TagPopover";
 
@@ -11,10 +12,11 @@ type Props = {
   onSelect?: (image: ImageDto) => void;
   allTags?: string[];
   onTagsChange?: (image: ImageDto, tags: string[]) => void;
+  onDelete?: (image: ImageDto) => Promise<void> | void;
   empty?: string;
 };
 
-export function ImageGrid({ images, onSelect, allTags, onTagsChange, empty = "Nothing here yet." }: Props) {
+export function ImageGrid({ images, onSelect, allTags, onTagsChange, onDelete, empty = "Nothing here yet." }: Props) {
   if (images.length === 0) {
     return (
       <Text c="dimmed" ta="center" py="xl">
@@ -25,7 +27,7 @@ export function ImageGrid({ images, onSelect, allTags, onTagsChange, empty = "No
   return (
     <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="lg">
       {images.map((img) => (
-        <ImageCard key={img.id} image={img} onSelect={onSelect} allTags={allTags} onTagsChange={onTagsChange} />
+        <ImageCard key={img.id} image={img} onSelect={onSelect} allTags={allTags} onTagsChange={onTagsChange} onDelete={onDelete} />
       ))}
     </SimpleGrid>
   );
@@ -93,7 +95,7 @@ function useLongPressCopy(url: string) {
   };
 }
 
-function ImageCard({ image: img, onSelect, allTags, onTagsChange }: { image: ImageDto } & Omit<Props, "images" | "empty">) {
+function ImageCard({ image: img, onSelect, allTags, onTagsChange, onDelete }: { image: ImageDto } & Omit<Props, "images" | "empty">) {
   const url = imageUrl(window.location.origin, img.name);
   const longPress = useLongPressCopy(url);
   const body = (
@@ -145,6 +147,7 @@ function ImageCard({ image: img, onSelect, allTags, onTagsChange }: { image: Ima
           )}
         </CopyButton>
         {onTagsChange && <TagPopover image={img} allTags={allTags ?? []} onChange={(tags) => onTagsChange(img, tags)} />}
+        {onDelete && <DeletePopover name={img.name} onConfirm={() => onDelete(img)} />}
       </Group>
     </div>
   );
