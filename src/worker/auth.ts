@@ -3,12 +3,16 @@ import { magicLink } from "better-auth/plugins";
 import { Kysely } from "kysely";
 import { D1Dialect } from "kysely-d1";
 import { hashPassword, PASSWORD_MAX, PASSWORD_MIN, verifyPassword } from "../shared/password";
+import type { Plan } from "../shared/types";
 import { userExists } from "./db";
 
-export const isFreePlan = (env: Env) => (env.PLAN as string) === "free";
+export const planOf = (env: Env): Plan => ((env.PLAN as string) === "free" ? "free" : "paid");
+
+const escapeHtml = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 export function createAuth(env: Env, origin: string) {
-  const free = isFreePlan(env);
+  const free = planOf(env) === "free";
   return betterAuth({
     appName: env.APP_NAME,
     baseURL: origin,
@@ -18,7 +22,8 @@ export function createAuth(env: Env, origin: string) {
       db: new Kysely<any>({ dialect: new D1Dialect({ database: env.DB }) }),
       type: "sqlite",
     },
-    rateLimit: { enabled: true },
+    // Counters live in D1 so every isolate shares them (the default memory store is per isolate).
+    rateLimit: { enabled: true, storage: "database" },
     // D1 blocks the introspection queries Kysely uses for schema validation.
     advanced: {
       database: { validateSchema: false },
@@ -50,12 +55,14 @@ export function createAuth(env: Env, origin: string) {
                 console.log(`[dev] magic link for ${email}: ${url}`);
                 return;
               }
+              const name = escapeHtml(env.APP_NAME);
+              const href = escapeHtml(url);
               await env.EMAIL.send({
                 to: email,
                 from: { email: env.EMAIL_FROM, name: env.APP_NAME },
                 subject: `Sign in to ${env.APP_NAME}`,
                 text: `Open this link to sign in to ${env.APP_NAME}:\n\n${url}\n\nIt expires in 10 minutes. If you didn't request it, you can ignore this email.`,
-                html: `<p>Open this link to sign in to <strong>${env.APP_NAME}</strong>:</p><p><a href="${url}">${url}</a></p><p>It expires in 10 minutes. If you didn't request it, you can ignore this email.</p>`,
+                html: `<p>Open this link to sign in to <strong>${name}</strong>:</p><p><a href="${href}">${href}</a></p><p>It expires in 10 minutes. If you didn't request it, you can ignore this email.</p>`,
               });
             },
           }),

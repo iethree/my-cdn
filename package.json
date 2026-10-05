@@ -6,7 +6,7 @@
     "setup": "bun scripts/setup.ts",
     "dev": "bun scripts/dev.ts",
     "build": "bun scripts/build.ts",
-    "deploy": "bun run build && wrangler deploy",
+    "deploy": "bun run build && wrangler d1 migrations apply DB --remote && wrangler deploy",
     "types": "wrangler types -c wrangler.template.jsonc",
     "postinstall": "wrangler types -c wrangler.template.jsonc",
     "typecheck": "tsc -p src/worker && tsc -p src/web",

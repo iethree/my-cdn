@@ -1,13 +1,22 @@
 import { DEFAULT_COLOR, HEX_RE } from "../shared/colors";
 import { hashPassword, PASSWORD_MAX, PASSWORD_MIN } from "../shared/password";
-import { EMAIL_RE, NAME_RE, PAGE_SIZE, THUMB_WIDTHS, normalizeTag, TAG_RE, type AppConfig, type Plan, type UploadEvent } from "../shared/types";
-import { createAuth } from "./auth";
+import { EMAIL_RE, MAX_UPLOAD_BYTES, NAME_RE, PAGE_SIZE, THUMB_WIDTHS, normalizeTag, TAG_RE, type AppConfig, type UploadEvent } from "../shared/types";
+import { createAuth, planOf } from "./auth";
 import * as db from "./db";
 import { HttpError, json } from "./http";
-import { MAX_BYTES, processUpload } from "./images";
+import { processUpload } from "./images";
 import { collectStats } from "./stats";
 
 const IMMUTABLE = "public, max-age=86400";
+
+// Malformed percent-escapes would otherwise throw and surface as a 500.
+function decode(s: string): string | null {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return null;
+  }
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -38,8 +47,8 @@ async function purge(origin: string, names: string[]) {
 
 async function serveImage(request: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405 });
-  const name = decodeURIComponent(url.pathname.slice(3));
-  if (!NAME_RE.test(name)) return new Response("Not found", { status: 404 });
+  const name = decode(url.pathname.slice(3));
+  if (!name || !NAME_RE.test(name)) return new Response("Not found", { status: 404 });
   const w = Number(url.searchParams.get("w"));
   const width = (THUMB_WIDTHS as readonly number[]).includes(w) ? w : undefined;
 
@@ -54,7 +63,8 @@ async function serveImage(request: Request, env: Env, ctx: ExecutionContext, url
       "Content-Type": img.content_type,
       "Cache-Control": IMMUTABLE,
       ETag: width ? `"${obj.etag}-${width}"` : obj.httpEtag,
-      "Content-Disposition": `inline; filename="${img.original_name.replace(/["\\]/g, "")}"`,
+      // Control characters (possible in API-supplied filenames) make the header invalid.
+      "Content-Disposition": `inline; filename="${img.original_name.replace(/[\x00-\x1f\x7f"\\]/g, "")}"`,
       "X-Content-Type-Options": "nosniff",
       "Access-Control-Allow-Origin": "*",
     });
@@ -101,8 +111,6 @@ function ndjson(ctx: ExecutionContext, run: (emit: (e: UploadEvent) => Promise<v
   });
 }
 
-const plan = (env: Env): Plan => ((env.PLAN as string) === "free" ? "free" : "paid");
-
 function pageLimit(url: URL): number {
   const n = Number(url.searchParams.get("limit"));
   return Number.isInteger(n) && n > 0 ? Math.min(n, PAGE_SIZE) : PAGE_SIZE;
@@ -134,12 +142,14 @@ async function readBody(request: Request): Promise<Record<string, unknown>> {
 }
 
 async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
-  const parts = url.pathname.slice(5).split("/").filter(Boolean).map(decodeURIComponent);
+  const decoded = url.pathname.slice(5).split("/").filter(Boolean).map(decode);
+  if (decoded.includes(null)) throw new HttpError(400, "Malformed URL");
+  const parts = decoded as string[];
   const method = request.method;
 
   if (method === "GET" && parts[0] === "config" && parts.length === 1) {
     const color = HEX_RE.test(env.APP_COLOR ?? "") ? env.APP_COLOR.toLowerCase() : DEFAULT_COLOR;
-    return Response.json({ name: env.APP_NAME, color, plan: plan(env) } satisfies AppConfig, { headers: { "Cache-Control": "no-cache" } });
+    return Response.json({ name: env.APP_NAME, color, plan: planOf(env) } satisfies AppConfig, { headers: { "Cache-Control": "no-cache" } });
   }
 
   if (method === "GET" && parts[0] === "tags") {
@@ -168,7 +178,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
       const email = String(body.email ?? "").trim().toLowerCase();
       if (!EMAIL_RE.test(email) || email.length > 254) throw new HttpError(400, "Enter a valid email address");
       let hash: string | undefined;
-      if (plan(env) === "free") {
+      if (planOf(env) === "free") {
         const password = typeof body.password === "string" ? body.password : "";
         if (password.length < PASSWORD_MIN || password.length > PASSWORD_MAX) {
           throw new HttpError(400, `Password must be ${PASSWORD_MIN} to ${PASSWORD_MAX} characters`);
@@ -192,7 +202,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
 
   if (!id) {
     if (method === "POST") {
-      if (Number(request.headers.get("Content-Length")) > MAX_BYTES + 4096) throw new HttpError(413, "File is larger than 25 MB");
+      if (Number(request.headers.get("Content-Length")) > MAX_UPLOAD_BYTES + 4096) throw new HttpError(413, "File is larger than 25 MB");
       const form = await request.formData();
       const file = form.get("file");
       if (!(file instanceof File)) throw new HttpError(400, "Missing file");
@@ -202,8 +212,9 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
   }
 
   if (id && !sub) {
-    const image = await db.getImage(env.DB, id);
-    if (!image) throw new HttpError(404, "Image not found");
+    const row = await db.findRowById(env.DB, id);
+    if (!row) throw new HttpError(404, "Image not found");
+    const image = (await db.hydrate(env.DB, [row]))[0]!;
     if (method === "GET") return json(image);
     if (method === "PATCH") {
       const body = await readBody(request);
@@ -218,7 +229,6 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
       return json(await db.getImage(env.DB, id));
     }
     if (method === "DELETE") {
-      const row = (await db.findRowById(env.DB, id))!;
       await db.deleteImage(env.DB, id);
       ctx.waitUntil(Promise.all([env.BUCKET.delete(row.key), purge(url.origin, [image.name, ...image.aliases])]));
       return json({ ok: true });

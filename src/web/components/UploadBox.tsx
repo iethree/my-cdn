@@ -1,7 +1,7 @@
 import { Anchor, Button, CopyButton, Group, Progress, Stack, TagsInput, Text, Tooltip } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { useEffect, useRef, useState } from "react";
-import { imageUrl, type ImageDto } from "../../shared/types";
+import { imageUrl, MAX_UPLOAD_BYTES, type ImageDto } from "../../shared/types";
 import { formatBytes, uploadImage, type ClientUploadEvent } from "../api";
 import { CheckIcon, CopyIcon, UploadIcon, XIcon } from "../icons";
 
@@ -9,7 +9,6 @@ type Stage = "queued" | "uploading" | "analyzing" | "compressing" | "storing" | 
 type Item = { key: string; file: File; preview: string; stage: Stage; loaded: number; image?: ImageDto; error?: string };
 
 const ACCEPT = IMAGE_MIME_TYPE.filter((t) => t !== "image/svg+xml");
-const MAX_SIZE = 25 * 1024 * 1024;
 const CONCURRENCY = 3;
 const UPLOAD_SHARE = 55;
 const PROCESS_STEPS: Record<Stage, number> = {
@@ -50,8 +49,9 @@ export function UploadBox({ suggestions, onUploaded }: { suggestions: string[]; 
   const active = useRef(0);
   const tagsRef = useRef(tags);
   tagsRef.current = tags;
+  const previews = useRef<string[]>([]);
 
-  useEffect(() => () => items.forEach((i) => URL.revokeObjectURL(i.preview)), []);
+  useEffect(() => () => previews.current.forEach((p) => URL.revokeObjectURL(p)), []);
 
   const patch = (key: string, p: Partial<Item>) =>
     setItems((prev) => prev.map((i) => (i.key === key ? { ...i, ...p } : i)));
@@ -85,6 +85,7 @@ export function UploadBox({ suggestions, onUploaded }: { suggestions: string[]; 
       stage: "queued",
       loaded: 0,
     }));
+    previews.current.push(...fresh.map((i) => i.preview));
     setItems((prev) => [...fresh, ...prev]);
     queue.current.push(...fresh);
     pump();
@@ -98,7 +99,7 @@ export function UploadBox({ suggestions, onUploaded }: { suggestions: string[]; 
         preview: "",
         stage: "error",
         loaded: 0,
-        error: file.size > MAX_SIZE ? "Larger than 25 MB" : "Not a supported image",
+        error: file.size > MAX_UPLOAD_BYTES ? "Larger than 25 MB" : "Not a supported image",
       })),
       ...prev,
     ]);
@@ -111,7 +112,7 @@ export function UploadBox({ suggestions, onUploaded }: { suggestions: string[]; 
         onDrop={onDrop}
         onReject={onReject}
         accept={ACCEPT}
-        maxSize={MAX_SIZE}
+        maxSize={MAX_UPLOAD_BYTES}
         multiple
         py={48}
         styles={{ root: { border: undefined, background: undefined } }}

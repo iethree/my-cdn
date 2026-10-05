@@ -1,16 +1,19 @@
 import { cancel, confirm, intro, isCancel, log, note, outro, password, select, spinner, text } from "@clack/prompts";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import pc from "picocolors";
 import { COLOR_PRESETS, DEFAULT_COLOR } from "../src/shared/colors";
 import { PASSWORD_MAX, PASSWORD_MIN } from "../src/shared/password";
+import { EMAIL_RE, type Plan } from "../src/shared/types";
 import { seedUser } from "./seed";
 
 const TEMPLATE = "wrangler.template.jsonc";
 const CONFIG = "wrangler.jsonc";
 const HOST_RE = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type Plan = "free" | "paid";
 type Result = { code: number; stdout: string; stderr: string; out: string };
+type Whoami = { loggedIn?: boolean; email?: string; accounts?: { id: string; name: string }[] };
 
 async function wrangler(args: string[], opts: { input?: string; inherit?: boolean } = {}): Promise<Result> {
   const proc = Bun.spawn(["bunx", "wrangler", ...args], {
@@ -25,6 +28,15 @@ async function wrangler(args: string[], opts: { input?: string; inherit?: boolea
   ]);
   const code = await proc.exited;
   return { code, stdout, stderr, out: `${stdout}\n${stderr}` };
+}
+
+async function whoami(): Promise<Whoami | null> {
+  const r = await wrangler(["whoami", "--json"]);
+  try {
+    return r.code === 0 ? (JSON.parse(r.stdout) as Whoami) : null;
+  } catch {
+    return null;
+  }
 }
 
 async function apiToken(): Promise<string | null> {
@@ -118,18 +130,29 @@ if (await Bun.file(CONFIG).exists()) {
 
 const login = spinner();
 login.start("Checking Cloudflare login");
-let who = await wrangler(["whoami"]);
-if (!/logged in/i.test(who.out)) {
+let who = await whoami();
+if (!who?.loggedIn) {
   login.stop("Not logged in to Cloudflare yet");
   log.info("Opening the Cloudflare login flow in your browser…");
   await wrangler(["login"], { inherit: true });
-  who = await wrangler(["whoami"]);
-  if (!/logged in/i.test(who.out)) bail("Cloudflare login didn't complete.", who.out);
+  who = await whoami();
+  if (!who?.loggedIn) bail("Cloudflare login didn't complete.");
   login.start("Checking Cloudflare login");
 }
-const cfEmail = /associated with the email (\S+?)\.?\s*$/m.exec(who.out)?.[1];
-const accountId = /\b([0-9a-f]{32})\b/.exec(who.out)?.[1];
-login.stop(`Logged in to Cloudflare${cfEmail ? ` as ${pc.bold(cfEmail)}` : ""}`);
+login.stop(`Logged in to Cloudflare${who.email ? ` as ${pc.bold(who.email)}` : ""}`);
+
+// Wrangler can't pick between several accounts non-interactively, so ask once and pin it.
+const accounts = who.accounts ?? [];
+const accountId =
+  accounts.length > 1
+    ? await ask(
+        select({
+          message: "Which Cloudflare account should it go on?",
+          options: accounts.map((a) => ({ value: a.id, label: a.name, hint: a.id })),
+        }),
+      )
+    : accounts[0]?.id;
+if (accountId) process.env.CLOUDFLARE_ACCOUNT_ID = accountId;
 
 const planSpinner = spinner();
 planSpinner.start("Checking your Workers plan");
@@ -260,8 +283,9 @@ await step("Creating R2 bucket", async () => {
 });
 
 await step("Writing config", async () => {
-  const cfg = JSON.parse(await Bun.file(TEMPLATE).text());
+  const cfg = Bun.JSONC.parse(await Bun.file(TEMPLATE).text()) as any;
   cfg.name = slug;
+  if (accountId) cfg.account_id = accountId;
   cfg.d1_databases[0].database_name = dbName;
   cfg.d1_databases[0].database_id = databaseId;
   cfg.r2_buckets[0].bucket_name = bucketName;
@@ -313,26 +337,44 @@ await step("Adding your first user", async () => {
   return { done: `${userEmail} can sign in` };
 });
 
+const authSecret = secret();
+
+// Ships the secret with the first version so the worker never runs without it.
+async function deployWithSecret(): Promise<Pick<Result, "code" | "out">> {
+  const dir = await mkdtemp(join(tmpdir(), "cdn-setup-"));
+  const file = join(dir, "secrets.json");
+  try {
+    await writeFile(file, JSON.stringify({ BETTER_AUTH_SECRET: authSecret }), { mode: 0o600 });
+    return await wrangler(["deploy", "--secrets-file", file]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 let deployedUrl: string | null = null;
+let secretStored = false;
 if (deploy) {
   log.step("Deploying");
   const built = await Bun.$`bun scripts/build.ts`.nothrow().quiet();
-  const r = built.exitCode === 0 ? await wrangler(["deploy"]) : { code: built.exitCode, out: built.stderr.toString() };
+  const r = built.exitCode === 0 ? await deployWithSecret() : { code: built.exitCode, out: built.stderr.toString() };
   console.log(pc.dim(r.out.trim()));
   if (r.code !== 0) {
     log.error(
       `Deploy didn't finish. Fix the error above and run ${pc.bold("bun run deploy")}.\nIf it mentions an existing DNS record on ${domain}, run ${pc.bold("bunx wrangler deploy --force")} to replace it.`,
     );
   } else {
+    secretStored = true;
     deployedUrl = /https:\/\/\S+\.workers\.dev/.exec(r.out)?.[0] ?? (domain ? `https://${domain}` : null);
   }
 }
 
-await step("Storing BETTER_AUTH_SECRET", async () => {
-  const r = await wrangler(["secret", "put", "BETTER_AUTH_SECRET"], { input: `${secret()}\n` });
-  if (r.code !== 0) throw new Error(`Couldn't store the secret. Run: bunx wrangler secret put BETTER_AUTH_SECRET\n${r.out}`);
-  return { done: "Secret stored on the worker" };
-});
+if (!secretStored) {
+  await step("Storing BETTER_AUTH_SECRET", async () => {
+    const r = await wrangler(["secret", "put", "BETTER_AUTH_SECRET"], { input: `${authSecret}\n` });
+    if (r.code !== 0) throw new Error(`Couldn't store the secret. Run: bunx wrangler secret put BETTER_AUTH_SECRET\n${r.out}`);
+    return { done: "Secret stored on the worker" };
+  });
+}
 
 const finalUrl = deployedUrl ?? (domain ? `https://${domain}` : "the workers.dev address wrangler prints on deploy");
 outro(

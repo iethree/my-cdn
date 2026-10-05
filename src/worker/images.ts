@@ -1,8 +1,7 @@
-import type { ImageDto, UploadEvent } from "../shared/types";
+import { MAX_UPLOAD_BYTES, type ImageDto, type UploadEvent } from "../shared/types";
 import * as db from "./db";
 import { HttpError } from "./http";
 
-export const MAX_BYTES = 25 * 1024 * 1024;
 export const MAX_DIM = 2048;
 
 const EXT = {
@@ -37,7 +36,7 @@ export async function processUpload(
   tags: string[],
   emit: (e: UploadEvent) => Promise<void>,
 ): Promise<ImageDto> {
-  if (file.size > MAX_BYTES) throw new HttpError(413, "File is larger than 25 MB");
+  if (file.size > MAX_UPLOAD_BYTES) throw new HttpError(413, "File is larger than 25 MB");
 
   await emit({ stage: "analyzing" });
   const info = await env.IMAGES.info(file.stream()).catch(() => null);
@@ -58,21 +57,30 @@ export async function processUpload(
   await emit({ stage: "storing" });
   const id = crypto.randomUUID();
   const key = `${id}.${EXT[format]}`;
-  const name = await db.uniqueName(env.DB, cleanName(file.name, EXT[format]));
+  let name = await db.uniqueName(env.DB, cleanName(file.name, EXT[format]));
   await env.BUCKET.put(key, bytes, { httpMetadata: { contentType: format } });
-  return db.insertImage(
-    env.DB,
-    {
-      id,
-      name,
-      original_name: file.name.slice(0, 200),
-      key,
-      content_type: format,
-      size: bytes.byteLength,
-      width,
-      height,
-      created_at: Date.now(),
-    },
-    tags,
-  );
+  const row = {
+    id,
+    key,
+    original_name: file.name.replace(/[\x00-\x1f\x7f]/g, "").slice(0, 200),
+    content_type: format,
+    size: bytes.byteLength,
+    width,
+    height,
+    created_at: Date.now(),
+  };
+  try {
+    // Concurrent uploads with the same filename can both pick the same free name; retry on the loser.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await db.insertImage(env.DB, { ...row, name }, tags);
+      } catch (e) {
+        if (attempt >= 2 || !String(e).includes("UNIQUE")) throw e;
+        name = await db.uniqueName(env.DB, name);
+      }
+    }
+  } catch (e) {
+    await env.BUCKET.delete(key);
+    throw e;
+  }
 }

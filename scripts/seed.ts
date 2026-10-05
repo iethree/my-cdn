@@ -18,8 +18,8 @@ export async function seedUser(email: string, remote: boolean, password?: string
 
 async function configuredPlan(): Promise<string> {
   try {
-    const text = (await Bun.file("wrangler.jsonc").text()).replace(/^\s*\/\/.*$/gm, "");
-    return JSON.parse(text)?.vars?.PLAN ?? "paid";
+    const cfg = Bun.JSONC.parse(await Bun.file("wrangler.jsonc").text()) as { vars?: { PLAN?: string } };
+    return cfg?.vars?.PLAN ?? "paid";
   } catch {
     return "paid";
   }

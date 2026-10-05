@@ -21,6 +21,7 @@ export type UploadEvent =
 export const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 export const TAG_RE = /^[a-z0-9][a-z0-9._-]{0,39}$/;
 export const THUMB_WIDTHS = [256, 512, 1024] as const;
+export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 export function normalizeTag(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9._-]/g, "").slice(0, 40);
@@ -42,5 +43,4 @@ export const PAGE_SIZE = 100;
 
 export type Stats = {
   storage: { bytes: number; objects: number; limitBytes: number };
-  fetchedAt: string;
 };

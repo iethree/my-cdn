@@ -28,6 +28,13 @@ export async function verifyPassword({ hash, password }: { hash: string; passwor
 
 export function generatePassword(length = 16): string {
   const alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = crypto.getRandomValues(new Uint8Array(length));
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+  // Reject bytes past the last full multiple of the alphabet so every character is equally likely.
+  const limit = 256 - (256 % alphabet.length);
+  let out = "";
+  while (out.length < length) {
+    for (const b of crypto.getRandomValues(new Uint8Array(length))) {
+      if (b < limit && out.length < length) out += alphabet[b % alphabet.length];
+    }
+  }
+  return out;
 }

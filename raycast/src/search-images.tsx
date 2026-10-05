@@ -14,7 +14,7 @@ import {
 import { useFetch } from "@raycast/utils";
 import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { useState } from "react";
 
 // Mirrors ImageDto / ImagePage in src/shared/types.ts.
@@ -62,7 +62,8 @@ async function copyImage(url: string, name: string) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const dir = join(tmpdir(), "my-cdn");
     await mkdir(dir, { recursive: true });
-    const file = join(dir, name);
+    // The name comes from the server; keep it inside our temp dir.
+    const file = join(dir, basename(name).replace(/^\.+/, "") || "image");
     await writeFile(file, Buffer.from(await res.arrayBuffer()));
     await Clipboard.copy({ file });
     await showHUD("Copied image");

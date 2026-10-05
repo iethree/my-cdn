@@ -17,7 +17,6 @@ const params = (o: Record<string, string | number | null | undefined>) =>
 export const api = {
   images: (q: string, cursor: string | null = null, limit?: number) =>
     request<ImagePage>("GET", `/api/images?${params({ q, cursor, limit })}`),
-  image: (id: string) => request<ImageDto>("GET", `/api/images/${id}`),
   update: (id: string, patch: { name?: string; tags?: string[] }) => request<ImageDto>("PATCH", `/api/images/${id}`, patch),
   remove: (id: string) => request<{ ok: true }>("DELETE", `/api/images/${id}`),
   addAlias: (id: string, name: string) => request<ImageDto>("POST", `/api/images/${id}/aliases`, { name }),

@@ -2,11 +2,9 @@
 
 A tiny personal image CDN on Cloudflare Workers. Clone it, run one command, and you have your own.
 
-- **Upload** (signed-in users only): drag-and-drop, server-side resize to max 2048×2048 and recompression via the Cloudflare Images binding, stored in R2.
-- **Serve** (public): `/i/<name>` with edge caching, `?w=256|512|1024` for thumbnails, `?download` for attachment.
-- **Search** (public): `GET /api/images?q=<text>` matches names, aliases and tags. Pages hold up to 100 results (`limit`), and the next page starts at `cursor`, taken from `nextCursor` in the response.
-- **Organize**: rename images, add aliases (extra names for the same file), tag anything from a one-click popover. `/t/<tag>` is a public gallery.
-- **Auth**: passwordless magic links via better-auth. Only people in the user list can sign in; signed-in users manage that list at `/u`.
+![preview](https://cdn.infopanel.org/i/my-cdn-preview.png)
+
+Works best with a domain so you can get email login and sweet links, but you can also run it from workers.dev if you want.
 
 ## Setup
 
@@ -17,7 +15,7 @@ bun install
 bun run setup
 ```
 
-Setup logs you in to Cloudflare if needed, asks for an app name, a primary color, the domain to serve from, and your email, then shows you exactly what it's about to create before it touches anything:
+Setup logs you in to Cloudflare if needed (and asks which account, if you have several), asks for an app name, a primary color, the domain to serve from, and your email, then shows you exactly what it's about to create before it touches anything:
 
 - a Worker on your custom domain (Cloudflare handles DNS and TLS) or a `*.workers.dev` address
 - a D1 database with the schema from `migrations/`
@@ -45,7 +43,7 @@ Change the name or color later by editing `APP_NAME` and `APP_COLOR` (any hex) u
 
 ```bash
 bun run dev                        # http://localhost:8787, sign-in links print to the console
-bun run deploy                     # build + wrangler deploy
+bun run deploy                     # build, apply pending migrations, wrangler deploy
 bun run user:add someone@x.com --remote   # add a user from the CLI (or use /u in the app); add --password '…' on Free
 bun run db:migrate                 # apply new migrations to production
 bun run seed:images --count 1000   # fill the local dev database with synthetic images
